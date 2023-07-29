@@ -25,11 +25,10 @@ class VanillaCFG:
     def __call__(self, x, sigma):
         x_u, x_c = x.chunk(2)
         scale_value = self.scale_schedule(sigma)
-        x_pred = self.dyn_thresh(x_u, x_c, scale_value)
-        return x_pred
+        return self.dyn_thresh(x_u, x_c, scale_value)
 
     def prepare_inputs(self, x, s, c, uc):
-        c_out = dict()
+        c_out = {}
 
         for k in c:
             if k in ["vector", "crossattn", "concat"]:
@@ -45,9 +44,5 @@ class IdentityGuider:
         return x
 
     def prepare_inputs(self, x, s, c, uc):
-        c_out = dict()
-
-        for k in c:
-            c_out[k] = c[k]
-
+        c_out = {k: c[k] for k in c}
         return x, s, c_out

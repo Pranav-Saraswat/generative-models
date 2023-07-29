@@ -143,7 +143,7 @@ def run_txt2img(
 
     if st.button("Sample"):
         st.write(f"**Model I:** {version}")
-        out = do_sample(
+        return do_sample(
             state["model"],
             sampler,
             value_dict,
@@ -156,7 +156,6 @@ def run_txt2img(
             return_latents=return_latents,
             filter=filter,
         )
-        return out
 
 
 def run_img2img(
@@ -194,7 +193,7 @@ def run_img2img(
     num_samples = num_rows * num_cols
 
     if st.button("Sample"):
-        out = do_img2img(
+        return do_img2img(
             repeat(img, "1 ... -> n ...", n=num_samples),
             state["model"],
             sampler,
@@ -204,7 +203,6 @@ def run_img2img(
             return_latents=return_latents,
             filter=filter,
         )
-        return out
 
 
 def apply_refiner(
@@ -235,7 +233,7 @@ def apply_refiner(
     value_dict["negative_aesthetic_score"] = 2.5
 
     st.warning(f"refiner input shape: {input.shape}")
-    samples = do_img2img(
+    return do_img2img(
         input,
         state["model"],
         sampler,
@@ -245,8 +243,6 @@ def apply_refiner(
         filter=filter,
         add_noise=not finish_denoising,
     )
-
-    return samples
 
 
 if __name__ == "__main__":
@@ -280,11 +276,7 @@ if __name__ == "__main__":
         "prompt",
         "Astronaut in a jungle, cold color palette, muted colors, detailed, 8k",
     )
-    if is_legacy:
-        negative_prompt = st.text_input("negative prompt", "")
-    else:
-        negative_prompt = ""  # which is unused
-
+    negative_prompt = st.text_input("negative prompt", "") if is_legacy else ""
     stage2strength = None
     finish_denoising = False
 

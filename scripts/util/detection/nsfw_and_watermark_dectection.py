@@ -72,7 +72,7 @@ class DeepFloydDataFiltering(object):
 
 def load_img(path: str) -> torch.Tensor:
     image = Image.open(path)
-    if not image.mode == "RGB":
+    if image.mode != "RGB":
         image = image.convert("RGB")
     image_transforms = T.Compose(
         [

@@ -31,12 +31,11 @@ MULTINODE_HACKS = True
 def default_trainer_args():
     argspec = dict(inspect.signature(Trainer.__init__).parameters)
     argspec.pop("self")
-    default_args = {
+    return {
         param: argspec[param].default
         for param in argspec
         if argspec[param] != Parameter.empty
     }
-    return default_args
 
 
 def get_parser(**parser_kwargs):
@@ -84,7 +83,7 @@ def get_parser(**parser_kwargs):
         metavar="base_config.yaml",
         help="paths to base configs. Loaded from left-to-right. "
         "Parameters can be overwritten or added with command-line options of the form `--key value`.",
-        default=list(),
+        default=[],
     )
     parser.add_argument(
         "-t",
@@ -196,7 +195,7 @@ def get_parser(**parser_kwargs):
         )
     default_args = default_trainer_args()
     for key in default_args:
-        parser.add_argument("--" + key, default=default_args[key])
+        parser.add_argument(f"--{key}", default=default_args[key])
     return parser
 
 
@@ -283,27 +282,24 @@ class SetupCallback(Callback):
 
                 time.sleep(5)
             OmegaConf.save(
-                self.config,
-                os.path.join(self.cfgdir, "{}-project.yaml".format(self.now)),
+                self.config, os.path.join(self.cfgdir, f"{self.now}-project.yaml")
             )
 
             print("Lightning config")
             print(OmegaConf.to_yaml(self.lightning_config))
             OmegaConf.save(
                 OmegaConf.create({"lightning": self.lightning_config}),
-                os.path.join(self.cfgdir, "{}-lightning.yaml".format(self.now)),
+                os.path.join(self.cfgdir, f"{self.now}-lightning.yaml"),
             )
 
-        else:
-            # ModelCheckpoint callback created log directory --- remove it
-            if not MULTINODE_HACKS and not self.resume and os.path.exists(self.logdir):
-                dst, name = os.path.split(self.logdir)
-                dst = os.path.join(dst, "child_runs", name)
-                os.makedirs(os.path.split(dst)[0], exist_ok=True)
-                try:
-                    os.rename(self.logdir, dst)
-                except FileNotFoundError:
-                    pass
+        elif not MULTINODE_HACKS and not self.resume and os.path.exists(self.logdir):
+            dst, name = os.path.split(self.logdir)
+            dst = os.path.join(dst, "child_runs", name)
+            os.makedirs(os.path.split(dst)[0], exist_ok=True)
+            try:
+                os.rename(self.logdir, dst)
+            except FileNotFoundError:
+                pass
 
 
 class ImageLogger(Callback):
@@ -449,7 +445,6 @@ class ImageLogger(Callback):
                 self.log_steps.pop(0)
             except IndexError as e:
                 print(e)
-                pass
             return True
         return False
 

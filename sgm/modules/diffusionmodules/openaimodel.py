@@ -600,13 +600,13 @@ class UNetModel(nn.Module):
 
         if isinstance(num_res_blocks, int):
             self.num_res_blocks = len(channel_mult) * [num_res_blocks]
-        else:
-            if len(num_res_blocks) != len(channel_mult):
-                raise ValueError(
-                    "provide num_res_blocks either as an int (globally constant) or "
-                    "as a list/tuple (per-level) with the same length as channel_mult"
-                )
+        elif len(num_res_blocks) == len(channel_mult):
             self.num_res_blocks = num_res_blocks
+        else:
+            raise ValueError(
+                "provide num_res_blocks either as an int (globally constant) or "
+                "as a list/tuple (per-level) with the same length as channel_mult"
+            )
         # self.num_res_blocks = num_res_blocks
         if disable_self_attentions is not None:
             # should be a list of booleans, indicating whether to disable self-attention in TransformerBlocks or not
@@ -1222,10 +1222,10 @@ class EncoderUNetModel(nn.Module):
         if self.pool.startswith("spatial"):
             results.append(h.type(x.dtype).mean(dim=(2, 3)))
             h = th.cat(results, axis=-1)
-            return self.out(h)
         else:
             h = h.type(x.dtype)
-            return self.out(h)
+
+        return self.out(h)
 
 
 if __name__ == "__main__":

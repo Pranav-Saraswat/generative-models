@@ -445,15 +445,13 @@ class BasicTransformerBlock(nn.Module):
         kwargs = {"x": x}
 
         if context is not None:
-            kwargs.update({"context": context})
+            kwargs["context"] = context
 
         if additional_tokens is not None:
-            kwargs.update({"additional_tokens": additional_tokens})
+            kwargs["additional_tokens"] = additional_tokens
 
         if n_times_crossframe_attn_in_self:
-            kwargs.update(
-                {"n_times_crossframe_attn_in_self": n_times_crossframe_attn_in_self}
-            )
+            kwargs["n_times_crossframe_attn_in_self"] = n_times_crossframe_attn_in_self
 
         # return mixed_checkpoint(self._forward, kwargs, self.parameters(), self.checkpoint)
         return checkpoint(

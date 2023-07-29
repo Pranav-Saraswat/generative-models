@@ -100,10 +100,7 @@ class GetWatermarkMatch:
         for k in range(bs):
             detected[k] = self.decoder.decode(x[k], "dwtDct")
         result = np.sum(detected == self.watermark, axis=-1)
-        if squeeze:
-            return result[0]
-        else:
-            return result
+        return result[0] if squeeze else result
 
 
 get_watermark_match = GetWatermarkMatch(WATERMARK_BITS)

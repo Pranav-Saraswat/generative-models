@@ -60,7 +60,7 @@ class AbstractAutoencoder(pl.LightningModule):
         for k in keys:
             for ik in ignore_keys:
                 if re.match(ik, k):
-                    print("Deleting key {} from state_dict.".format(k))
+                    print(f"Deleting key {k} from state_dict.")
                     del sd[k]
         missing, unexpected = self.load_state_dict(sd, strict=False)
         print(
@@ -148,17 +148,15 @@ class AutoencodingEngine(AbstractAutoencoder):
         return batch[self.input_key]
 
     def get_autoencoder_params(self) -> list:
-        params = (
+        return (
             list(self.encoder.parameters())
             + list(self.decoder.parameters())
             + list(self.regularization.get_trainable_parameters())
             + list(self.loss.get_trainable_autoencoder_parameters())
         )
-        return params
 
     def get_discriminator_params(self) -> list:
-        params = list(self.loss.get_trainable_parameters())  # e.g., discriminator
-        return params
+        return list(self.loss.get_trainable_parameters())
 
     def get_last_layer(self):
         return self.decoder.get_last_layer()
@@ -166,13 +164,10 @@ class AutoencodingEngine(AbstractAutoencoder):
     def encode(self, x: Any, return_reg_log: bool = False) -> Any:
         z = self.encoder(x)
         z, reg_log = self.regularization(z)
-        if return_reg_log:
-            return z, reg_log
-        return z
+        return (z, reg_log) if return_reg_log else z
 
     def decode(self, z: Any) -> torch.Tensor:
-        x = self.decoder(z)
-        return x
+        return self.decoder(z)
 
     def forward(self, x: Any) -> Tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
         z, reg_log = self.encode(x, return_reg_log=True)
@@ -234,7 +229,7 @@ class AutoencodingEngine(AbstractAutoencoder):
             0,
             self.global_step,
             last_layer=self.get_last_layer(),
-            split="val" + postfix,
+            split=f"val{postfix}",
         )
 
         discloss, log_dict_disc = self.loss(
@@ -244,7 +239,7 @@ class AutoencodingEngine(AbstractAutoencoder):
             1,
             self.global_step,
             last_layer=self.get_last_layer(),
-            split="val" + postfix,
+            split=f"val{postfix}",
         )
         self.log(f"val{postfix}/rec_loss", log_dict_ae[f"val{postfix}/rec_loss"])
         log_dict_ae.update(log_dict_disc)
@@ -268,11 +263,9 @@ class AutoencodingEngine(AbstractAutoencoder):
 
     @torch.no_grad()
     def log_images(self, batch: Dict, **kwargs) -> Dict:
-        log = dict()
         x = self.get_input(batch)
         _, xrec, _ = self(x)
-        log["inputs"] = x
-        log["reconstructions"] = xrec
+        log = {"inputs": x, "reconstructions": xrec}
         with self.ema_scope():
             _, xrec_ema, _ = self(x)
             log["reconstructions_ema"] = xrec_ema
@@ -307,13 +300,11 @@ class AutoencoderKL(AutoencodingEngine):
         ), f"{self.__class__.__name__} only supports inference currently"
         h = self.encoder(x)
         moments = self.quant_conv(h)
-        posterior = DiagonalGaussianDistribution(moments)
-        return posterior
+        return DiagonalGaussianDistribution(moments)
 
     def decode(self, z, **decoder_kwargs):
         z = self.post_quant_conv(z)
-        dec = self.decoder(z, **decoder_kwargs)
-        return dec
+        return self.decoder(z, **decoder_kwargs)
 
 
 class AutoencoderKLInferenceWrapper(AutoencoderKL):

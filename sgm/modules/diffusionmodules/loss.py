@@ -65,5 +65,4 @@ class StandardDiffusionLoss(nn.Module):
                 (w * (model_output - target).abs()).reshape(target.shape[0], -1), 1
             )
         elif self.type == "lpips":
-            loss = self.lpips(model_output, target).reshape(-1)
-            return loss
+            return self.lpips(model_output, target).reshape(-1)

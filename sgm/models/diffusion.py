@@ -227,8 +227,7 @@ class DiffusionEngine(pl.LightningModule):
         denoiser = lambda input, sigma, c: self.denoiser(
             self.model, input, sigma, c, **kwargs
         )
-        samples = self.sampler(denoiser, randn, cond, uc=uc)
-        return samples
+        return self.sampler(denoiser, randn, cond, uc=uc)
 
     @torch.no_grad()
     def log_conditionings(self, batch: Dict, n: int) -> Dict:
@@ -237,7 +236,7 @@ class DiffusionEngine(pl.LightningModule):
         These can be lists of strings (text-to-image), tensors, ints, ...
         """
         image_h, image_w = batch[self.input_key].shape[2:]
-        log = dict()
+        log = {}
 
         for embedder in self.conditioner.embedders:
             if (
@@ -286,8 +285,6 @@ class DiffusionEngine(pl.LightningModule):
             )
         else:
             ucg_keys = conditioner_input_keys
-        log = dict()
-
         x = self.get_input(batch)
 
         c, uc = self.conditioner.get_unconditional_conditioning(
@@ -301,10 +298,10 @@ class DiffusionEngine(pl.LightningModule):
 
         N = min(x.shape[0], N)
         x = x.to(self.device)[:N]
-        log["inputs"] = x
+        log = {"inputs": x}
         z = self.encode_first_stage(x)
         log["reconstructions"] = self.decode_first_stage(z)
-        log.update(self.log_conditionings(batch, N))
+        log |= self.log_conditionings(batch, N)
 
         for k in c:
             if isinstance(c[k], torch.Tensor):

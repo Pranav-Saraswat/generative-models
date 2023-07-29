@@ -73,8 +73,8 @@ embed_watemark = WatermarkEmbedder(WATERMARK_BITS)
 
 @st.cache_resource()
 def init_st(version_dict, load_ckpt=True, load_filter=True):
-    state = dict()
-    if not "model" in state:
+    state = {}
+    if "model" not in state:
         config = version_dict["config"]
         ckpt = version_dict["ckpt"]
 
@@ -135,8 +135,6 @@ def load_model_from_config(config, ckpt=None, verbose=True):
         else:
             raise NotImplementedError
 
-        msg = None
-
         m, u = model.load_state_dict(sd, strict=False)
 
         if len(m) > 0 and verbose:
@@ -145,8 +143,7 @@ def load_model_from_config(config, ckpt=None, verbose=True):
         if len(u) > 0 and verbose:
             print("unexpected keys:")
             print(u)
-    else:
-        msg = None
+    msg = None
 
     model = initial_model_load(model)
     model.eval()
@@ -154,7 +151,7 @@ def load_model_from_config(config, ckpt=None, verbose=True):
 
 
 def get_unique_embedder_keys_from_conditioner(conditioner):
-    return list(set([x.input_key for x in conditioner.embedders]))
+    return list({x.input_key for x in conditioner.embedders})
 
 
 def init_embedder_options(keys, init_dict, prompt=None, negative_prompt=None):
@@ -243,12 +240,12 @@ class Img2ImgDiscretizationWrapper:
     def __call__(self, *args, **kwargs):
         # sigmas start large first, and decrease then
         sigmas = self.discretization(*args, **kwargs)
-        print(f"sigmas after discretization, before pruning img2img: ", sigmas)
+        print("sigmas after discretization, before pruning img2img: ", sigmas)
         sigmas = torch.flip(sigmas, (0,))
         sigmas = sigmas[: max(int(self.strength * len(sigmas)), 1)]
         print("prune index:", max(int(self.strength * len(sigmas)), 1))
         sigmas = torch.flip(sigmas, (0,))
-        print(f"sigmas after pruning: ", sigmas)
+        print("sigmas after pruning: ", sigmas)
         return sigmas
 
 
@@ -268,17 +265,14 @@ class Txt2NoisyDiscretizationWrapper:
     def __call__(self, *args, **kwargs):
         # sigmas start large first, and decrease then
         sigmas = self.discretization(*args, **kwargs)
-        print(f"sigmas after discretization, before pruning img2img: ", sigmas)
+        print("sigmas after discretization, before pruning img2img: ", sigmas)
         sigmas = torch.flip(sigmas, (0,))
-        if self.original_steps is None:
-            steps = len(sigmas)
-        else:
-            steps = self.original_steps + 1
+        steps = len(sigmas) if self.original_steps is None else self.original_steps + 1
         prune_index = max(min(int(self.strength * steps) - 1, steps - 1), 0)
         sigmas = sigmas[prune_index:]
         print("prune index:", prune_index)
         sigmas = torch.flip(sigmas, (0,))
-        print(f"sigmas after pruning: ", sigmas)
+        print("sigmas after pruning: ", sigmas)
         return sigmas
 
 
@@ -399,7 +393,7 @@ def get_discretization(discretization, key=1):
 
 
 def get_sampler(sampler_name, steps, discretization_config, guider_config, key=1):
-    if sampler_name == "EulerEDMSampler" or sampler_name == "HeunEDMSampler":
+    if sampler_name in ["EulerEDMSampler", "HeunEDMSampler"]:
         s_churn = st.sidebar.number_input(f"s_churn #{key}", value=0.0, min_value=0.0)
         s_tmin = st.sidebar.number_input(f"s_tmin #{key}", value=0.0, min_value=0.0)
         s_tmax = st.sidebar.number_input(f"s_tmax #{key}", value=999.0, min_value=0.0)
@@ -427,10 +421,7 @@ def get_sampler(sampler_name, steps, discretization_config, guider_config, key=1
                 s_noise=s_noise,
                 verbose=True,
             )
-    elif (
-        sampler_name == "EulerAncestralSampler"
-        or sampler_name == "DPMPP2SAncestralSampler"
-    ):
+    elif sampler_name in ["EulerAncestralSampler", "DPMPP2SAncestralSampler"]:
         s_noise = st.sidebar.number_input("s_noise", value=1.0, min_value=0.0)
         eta = st.sidebar.number_input("eta", value=1.0, min_value=0.0)
 
@@ -478,7 +469,7 @@ def get_interactive_image(key=None) -> Image.Image:
     image = st.file_uploader("Input", type=["jpg", "JPEG", "png"], key=key)
     if image is not None:
         image = Image.open(image)
-        if not image.mode == "RGB":
+        if image.mode != "RGB":
             image = image.convert("RGB")
         return image
 
@@ -557,7 +548,7 @@ def do_sample(
                 unload_model(model.conditioner)
 
                 for k in c:
-                    if not k == "crossattn":
+                    if k != "crossattn":
                         c[k], uc[k] = map(
                             lambda y: y[k][: math.prod(num_samples)].to("cuda"), (c, uc)
                         )
@@ -592,9 +583,7 @@ def do_sample(
                 grid = rearrange(grid, "n b c h w -> (n h) (b w) c")
                 outputs.image(grid.cpu().numpy())
 
-                if return_latents:
-                    return samples, samples_z
-                return samples
+                return (samples, samples_z) if return_latents else samples
 
 
 def get_batch(keys, value_dict, N: Union[List, ListConfig], device="cuda"):
@@ -604,7 +593,37 @@ def get_batch(keys, value_dict, N: Union[List, ListConfig], device="cuda"):
     batch_uc = {}
 
     for key in keys:
-        if key == "txt":
+        if key == "aesthetic_score":
+            batch["aesthetic_score"] = (
+                torch.tensor([value_dict["aesthetic_score"]]).to(device).repeat(*N, 1)
+            )
+            batch_uc["aesthetic_score"] = (
+                torch.tensor([value_dict["negative_aesthetic_score"]])
+                .to(device)
+                .repeat(*N, 1)
+            )
+
+        elif key == "crop_coords_top_left":
+            batch["crop_coords_top_left"] = (
+                torch.tensor(
+                    [value_dict["crop_coords_top"], value_dict["crop_coords_left"]]
+                )
+                .to(device)
+                .repeat(*N, 1)
+            )
+        elif key == "original_size_as_tuple":
+            batch["original_size_as_tuple"] = (
+                torch.tensor([value_dict["orig_height"], value_dict["orig_width"]])
+                .to(device)
+                .repeat(*N, 1)
+            )
+        elif key == "target_size_as_tuple":
+            batch["target_size_as_tuple"] = (
+                torch.tensor([value_dict["target_height"], value_dict["target_width"]])
+                .to(device)
+                .repeat(*N, 1)
+            )
+        elif key == "txt":
             batch["txt"] = (
                 np.repeat([value_dict["prompt"]], repeats=math.prod(N))
                 .reshape(N)
@@ -615,40 +634,10 @@ def get_batch(keys, value_dict, N: Union[List, ListConfig], device="cuda"):
                 .reshape(N)
                 .tolist()
             )
-        elif key == "original_size_as_tuple":
-            batch["original_size_as_tuple"] = (
-                torch.tensor([value_dict["orig_height"], value_dict["orig_width"]])
-                .to(device)
-                .repeat(*N, 1)
-            )
-        elif key == "crop_coords_top_left":
-            batch["crop_coords_top_left"] = (
-                torch.tensor(
-                    [value_dict["crop_coords_top"], value_dict["crop_coords_left"]]
-                )
-                .to(device)
-                .repeat(*N, 1)
-            )
-        elif key == "aesthetic_score":
-            batch["aesthetic_score"] = (
-                torch.tensor([value_dict["aesthetic_score"]]).to(device).repeat(*N, 1)
-            )
-            batch_uc["aesthetic_score"] = (
-                torch.tensor([value_dict["negative_aesthetic_score"]])
-                .to(device)
-                .repeat(*N, 1)
-            )
-
-        elif key == "target_size_as_tuple":
-            batch["target_size_as_tuple"] = (
-                torch.tensor([value_dict["target_height"], value_dict["target_width"]])
-                .to(device)
-                .repeat(*N, 1)
-            )
         else:
             batch[key] = value_dict[key]
 
-    for key in batch.keys():
+    for key in batch:
         if key not in batch_uc and isinstance(batch[key], torch.Tensor):
             batch_uc[key] = torch.clone(batch[key])
     return batch, batch_uc
@@ -739,6 +728,4 @@ def do_img2img(
                 grid = embed_watemark(torch.stack([samples]))
                 grid = rearrange(grid, "n b c h w -> (n h) (b w) c")
                 outputs.image(grid.cpu().numpy())
-                if return_latents:
-                    return samples, samples_z
-                return samples
+                return (samples, samples_z) if return_latents else samples

@@ -50,28 +50,27 @@ def mixed_checkpoint(func, inputs: dict, params, flag):
                    explicitly take as arguments.
     :param flag: if False, disable gradient checkpointing.
     """
-    if flag:
-        tensor_keys = [key for key in inputs if isinstance(inputs[key], torch.Tensor)]
-        tensor_inputs = [
-            inputs[key] for key in inputs if isinstance(inputs[key], torch.Tensor)
-        ]
-        non_tensor_keys = [
-            key for key in inputs if not isinstance(inputs[key], torch.Tensor)
-        ]
-        non_tensor_inputs = [
-            inputs[key] for key in inputs if not isinstance(inputs[key], torch.Tensor)
-        ]
-        args = tuple(tensor_inputs) + tuple(non_tensor_inputs) + tuple(params)
-        return MixedCheckpointFunction.apply(
-            func,
-            len(tensor_inputs),
-            len(non_tensor_inputs),
-            tensor_keys,
-            non_tensor_keys,
-            *args,
-        )
-    else:
+    if not flag:
         return func(**inputs)
+    tensor_keys = [key for key in inputs if isinstance(inputs[key], torch.Tensor)]
+    tensor_inputs = [
+        inputs[key] for key in inputs if isinstance(inputs[key], torch.Tensor)
+    ]
+    non_tensor_keys = [
+        key for key in inputs if not isinstance(inputs[key], torch.Tensor)
+    ]
+    non_tensor_inputs = [
+        inputs[key] for key in inputs if not isinstance(inputs[key], torch.Tensor)
+    ]
+    args = tuple(tensor_inputs) + tuple(non_tensor_inputs) + tuple(params)
+    return MixedCheckpointFunction.apply(
+        func,
+        len(tensor_inputs),
+        len(non_tensor_inputs),
+        tensor_keys,
+        non_tensor_keys,
+        *args,
+    )
 
 
 class MixedCheckpointFunction(torch.autograd.Function):
@@ -97,15 +96,10 @@ class MixedCheckpointFunction(torch.autograd.Function):
             and len(non_tensor_keys) == length_non_tensors
         )
 
-        ctx.input_tensors = {
-            key: val for (key, val) in zip(tensor_keys, list(args[: ctx.end_tensors]))
-        }
-        ctx.input_non_tensors = {
-            key: val
-            for (key, val) in zip(
-                non_tensor_keys, list(args[ctx.end_tensors : ctx.end_non_tensors])
-            )
-        }
+        ctx.input_tensors = dict(zip(tensor_keys, list(args[: ctx.end_tensors])))
+        ctx.input_non_tensors = dict(
+            zip(non_tensor_keys, list(args[ctx.end_tensors : ctx.end_non_tensors]))
+        )
         ctx.run_function = run_function
         ctx.input_params = list(args[ctx.end_non_tensors :])
 
